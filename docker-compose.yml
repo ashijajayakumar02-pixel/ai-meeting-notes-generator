@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  # Main web application
+  app:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=production
+      - SECRET_KEY=your-secret-key-here
+      - OLLAMA_BASE_URL=http://ollama:11434
+    volumes:
+      - ./uploads:/app/uploads
+      - ./data:/app/data
+    depends_on:
+      - ollama
+    networks:
+      - ai-meeting-network
+    restart: unless-stopped
+
+  # Ollama service for local LLM
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    networks:
+      - ai-meeting-network
+    restart: unless-stopped
+    # Pull the model on startup
+    command: >
+      sh -c "ollama serve & 
+             sleep 10 && 
+             ollama pull llama3.1:8b && 
+             wait"
+
+  # Optional: Redis for session storage (if needed)
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - ai-meeting-network
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+volumes:
+  ollama_data:
+  redis_data:
+
+networks:
+  ai-meeting-network:
+    driver: bridge
